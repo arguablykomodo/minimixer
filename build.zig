@@ -14,6 +14,7 @@ pub fn build(b: *std.build.Builder) void {
     const exe = b.addExecutable("minimixer", "src/main.zig");
     exe.linkLibC();
     exe.linkSystemLibrary("X11");
+    exe.linkSystemLibrary("xft");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
