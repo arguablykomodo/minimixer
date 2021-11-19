@@ -15,6 +15,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.linkLibC();
     exe.linkSystemLibrary("X11");
     exe.linkSystemLibrary("xft");
+    exe.linkSystemLibrary("libpulse");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
