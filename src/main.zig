@@ -31,7 +31,7 @@ fn stateCallback(pulse_context: ?*pa_context, userdata: ?*c_void) callconv(.C) v
             std.process.exit(1);
         },
         pa_context_state.PA_CONTEXT_TERMINATED => null,
-        else => unreachable
+        else => unreachable,
     };
 }
 
@@ -109,7 +109,7 @@ pub fn main() anyerror!void {
                     y += 20;
                 }
             },
-            else => unreachable
+            else => unreachable,
         }
     }
 }
