@@ -40,6 +40,24 @@ pub const PulseHandler = struct {
         pointers.x_handler.draw();
     }
 
+    fn sink_change_cb(
+        context: ?*pa_context,
+        info: [*c]const pa_sink_input_info,
+        eol: c_int,
+        userdata: ?*c_void,
+    ) callconv(.C) void {
+        if (eol == 1) return;
+        const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
+        for (pointers.entries.items) |*entry, i| {
+            if (entry.id == info.*.index) {
+                entry.name.clearRetainingCapacity();
+                entry.name.appendSlice(std.mem.span(info.*.name)) catch unreachable;
+                pointers.x_handler.draw();
+                break;
+            }
+        }
+    }
+
     fn context_subscribe_cb(
         context: ?*pa_context,
         event: pa_subscription_event_type,
@@ -54,15 +72,19 @@ pub const PulseHandler = struct {
             .PA_SUBSCRIPTION_EVENT_NEW => {
                 pa_operation_unref(pa_context_get_sink_input_info(context, idx, sink_new_cb, userdata));
             },
-            .PA_SUBSCRIPTION_EVENT_CHANGE => {},
+            .PA_SUBSCRIPTION_EVENT_CHANGE => {
+                pa_operation_unref(pa_context_get_sink_input_info(context, idx, sink_change_cb, userdata));
+            },
             .PA_SUBSCRIPTION_EVENT_REMOVE => {
                 const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
-                const i = for (pointers.entries.items) |entry, j| {
-                    if (entry.id == idx) break j;
-                } else return;
-                const entry = pointers.entries.orderedRemove(i);
-                entry.name.deinit();
-                pointers.x_handler.draw();
+                for (pointers.entries.items) |entry, i| {
+                    if (entry.id == idx) {
+                        entry.name.deinit();
+                        _ = pointers.entries.orderedRemove(i);
+                        pointers.x_handler.draw();
+                        break;
+                    }
+                }
             },
             else => unreachable,
         }
