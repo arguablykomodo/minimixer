@@ -1,4 +1,5 @@
 const std = @import("std");
+const Entry = @import("./main.zig").Entry;
 usingnamespace @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xft/Xft.h");
@@ -74,9 +75,9 @@ pub const XHandler = struct {
     font: *XftFont,
     text_color: XftColor,
     xft: *XftDraw,
-    text: *std.ArrayList([]const u8),
+    entries: *std.ArrayList(Entry),
 
-    pub fn init(text: *std.ArrayList([]const u8)) !@This() {
+    pub fn init(entries: *std.ArrayList(Entry)) !@This() {
         const display = XOpenDisplay(null) orelse return error.XOpenDisplay;
         const screen = XDefaultScreen(display);
         const visual = XDefaultVisual(display, screen);
@@ -110,7 +111,7 @@ pub const XHandler = struct {
             .font = font,
             .text_color = text_color,
             .xft = xft,
-            .text = text,
+            .entries = entries,
         };
     }
 
@@ -118,6 +119,17 @@ pub const XHandler = struct {
         XftFontClose(self.display, self.font);
         XftColorFree(self.display, self.visual, self.colormap, &self.text_color);
         _ = XCloseDisplay(self.display);
+    }
+
+    pub fn draw(self: @This()) void {
+        var extents: XGlyphInfo = undefined;
+        var y: c_int = 0;
+        for (self.entries.items) |entry| {
+            const len = @intCast(c_int, entry.name.len);
+            _ = XftTextExtentsUtf8(self.display, self.font, entry.name.ptr, len, &extents);
+            y += extents.height;
+            _ = XftDrawStringUtf8(self.xft, &self.text_color, self.font, 0, y, entry.name.ptr, len);
+        }
     }
 
     pub fn main_loop(self: @This()) !void {
@@ -129,16 +141,7 @@ pub const XHandler = struct {
                     const key_press_event = @ptrCast(*XKeyPressedEvent, &event);
                     if (key_press_event.keycode == 9) return; // ESC
                 },
-                Expose => {
-                    var extents: XGlyphInfo = undefined;
-                    var y: c_int = 0;
-                    for (self.text.items) |line| {
-                        const len = @intCast(c_int, line.len);
-                        _ = XftTextExtentsUtf8(self.display, self.font, line.ptr, len, &extents);
-                        y += extents.height;
-                        _ = XftDrawStringUtf8(self.xft, &self.text_color, self.font, 0, y, line.ptr, len);
-                    }
-                },
+                Expose => self.draw(),
                 else => unreachable,
             }
         }
