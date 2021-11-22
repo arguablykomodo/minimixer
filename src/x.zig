@@ -20,6 +20,7 @@ const font_name = "Fira Code:style=Regular";
 
 const background = 0x222222;
 const volume_bg = 0x333333;
+const volume_fg = 0x555555;
 const foreground = 0xAAAAAA;
 
 fn renderColor(comptime hex: comptime_int) XRenderColor {
@@ -107,6 +108,7 @@ pub const XHandler = struct {
     font: *XftFont,
     foreground: XftColor,
     volume_bg: XftColor,
+    volume_fg: XftColor,
     xft: *XftDraw,
     entries: *std.ArrayList(Entry),
     pulse_handler: *PulseHandler,
@@ -139,6 +141,7 @@ pub const XHandler = struct {
             .font = font,
             .foreground = try allocColor(display, visual, colormap, renderColor(foreground)),
             .volume_bg = try allocColor(display, visual, colormap, renderColor(volume_bg)),
+            .volume_fg = try allocColor(display, visual, colormap, renderColor(volume_fg)),
             .xft = xft,
             .entries = entries,
             .pulse_handler = pulse_handler,
@@ -161,7 +164,7 @@ pub const XHandler = struct {
             _ = XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
             y += inner_padding;
             _ = XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, 400, 10);
-            _ = XftDrawRect(self.xft, &self.foreground, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
+            _ = XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
             y += volume_height + outer_padding;
         }
         _ = XFlush(self.display);
