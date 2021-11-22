@@ -4,15 +4,17 @@ const PulseHandler = @import("./pulse.zig").PulseHandler;
 
 pub const Entry = struct {
     id: c_uint,
-    name: []const u8,
+    name: std.ArrayList(u8),
 };
 var entries = std.ArrayList(Entry).init(std.heap.c_allocator);
 
 pub fn main() anyerror!void {
-    const pulse = try PulseHandler.init(&entries);
+    var x = try XHandler.init(&entries);
+    defer x.uninit();
+
+    var pulse = try PulseHandler.init(&entries, &x);
     defer pulse.uninit();
 
-    var handler = try XHandler.init(&entries);
-    defer handler.uninit();
-    try handler.main_loop();
+    try pulse.start();
+    try x.main_loop();
 }

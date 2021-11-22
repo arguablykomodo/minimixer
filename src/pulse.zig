@@ -1,10 +1,11 @@
 const std = @import("std");
 const Entry = @import("./main.zig").Entry;
+const XHandler = @import("./x.zig").XHandler;
 usingnamespace @cImport({
     @cInclude("pulse/pulseaudio.h");
 });
 
-const name = "minimixer";
+const context_name = "minimixer";
 
 fn check(status: c_int, comptime err: anyerror) !void {
     if (status < 0) {
@@ -12,9 +13,15 @@ fn check(status: c_int, comptime err: anyerror) !void {
     }
 }
 
+pub const Pointers = struct {
+    entries: *std.ArrayList(Entry),
+    x_handler: *XHandler,
+};
+
 pub const PulseHandler = struct {
     mainloop: *pa_threaded_mainloop,
     context: *pa_context,
+    pointers: Pointers,
 
     fn sink_new_cb(
         context: ?*pa_context,
@@ -23,11 +30,14 @@ pub const PulseHandler = struct {
         userdata: ?*c_void,
     ) callconv(.C) void {
         if (eol == 1) return;
-        const entries = @ptrCast(*std.ArrayList(Entry), @alignCast(8, userdata));
-        entries.append(.{
+        var name = std.ArrayList(u8).init(std.heap.c_allocator);
+        name.appendSlice(std.mem.span(info.*.name)) catch unreachable;
+        const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
+        pointers.entries.append(.{
             .id = info.*.index,
-            .name = std.mem.span(info.*.name),
+            .name = name,
         }) catch unreachable;
+        pointers.x_handler.draw();
     }
 
     fn context_subscribe_cb(
@@ -46,11 +56,13 @@ pub const PulseHandler = struct {
             },
             .PA_SUBSCRIPTION_EVENT_CHANGE => {},
             .PA_SUBSCRIPTION_EVENT_REMOVE => {
-                const entries = @ptrCast(*std.ArrayList(Entry), @alignCast(8, userdata));
-                const i = for (entries.items) |entry, j| {
+                const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
+                const i = for (pointers.entries.items) |entry, j| {
                     if (entry.id == idx) break j;
                 } else return;
-                _ = entries.orderedRemove(i);
+                const entry = pointers.entries.orderedRemove(i);
+                entry.name.deinit();
+                pointers.x_handler.draw();
             },
             else => unreachable,
         }
@@ -64,9 +76,9 @@ pub const PulseHandler = struct {
             .PA_CONTEXT_AUTHORIZING => {},
             .PA_CONTEXT_SETTING_NAME => {},
             .PA_CONTEXT_READY => {
-                pa_operation_unref(pa_context_subscribe(context, .PA_SUBSCRIPTION_MASK_SINK_INPUT, null, null));
                 pa_operation_unref(pa_context_get_sink_input_info_list(context, sink_new_cb, userdata));
                 pa_context_set_subscribe_callback(context, context_subscribe_cb, userdata);
+                pa_operation_unref(pa_context_subscribe(context, .PA_SUBSCRIPTION_MASK_SINK_INPUT, null, null));
             },
             .PA_CONTEXT_FAILED => {
                 std.log.err("failed to connect to pulseaudio", .{});
@@ -77,19 +89,27 @@ pub const PulseHandler = struct {
         }
     }
 
-    pub fn init(entries: *std.ArrayList(Entry)) !@This() {
-        const mainloop = pa_threaded_mainloop_new() orelse return error.PulseMainloopNew;
-        try check(pa_threaded_mainloop_start(mainloop), error.PulseMainloopStart);
-
-        const api = pa_threaded_mainloop_get_api(mainloop);
-        const context = pa_context_new(api, name) orelse return error.PulseContextNew;
-        pa_context_set_state_callback(context, context_state_cb, entries);
-        try check(pa_context_connect(context, null, pa_context_flags.PA_CONTEXT_NOFLAGS, null), error.PulseContextConnect);
-
-        return PulseHandler{
-            .mainloop = mainloop,
-            .context = context,
+    pub fn init(entries: *std.ArrayList(Entry), x_handler: *XHandler) !@This() {
+        var handler = PulseHandler{
+            .mainloop = undefined,
+            .context = undefined,
+            .pointers = Pointers{
+                .entries = entries,
+                .x_handler = x_handler,
+            },
         };
+
+        handler.mainloop = pa_threaded_mainloop_new() orelse return error.PulseMainloopNew;
+        const api = pa_threaded_mainloop_get_api(handler.mainloop);
+        handler.context = pa_context_new(api, context_name) orelse return error.PulseContextNew;
+
+        return handler;
+    }
+
+    pub fn start(self: *@This()) !void {
+        pa_context_set_state_callback(self.context, context_state_cb, &self.pointers);
+        try check(pa_context_connect(self.context, null, .PA_CONTEXT_NOAUTOSPAWN, null), error.PulseContextConnect);
+        try check(pa_threaded_mainloop_start(self.mainloop), error.PulseMainloopStart);
     }
 
     pub fn uninit(self: @This()) void {
