@@ -30,6 +30,32 @@ pub const PulseHandler = struct {
         }) catch unreachable;
     }
 
+    fn context_subscribe_cb(
+        context: ?*pa_context,
+        event: pa_subscription_event_type,
+        idx: c_uint,
+        userdata: ?*c_void,
+    ) callconv(.C) void {
+        const event_type = @intToEnum(pa_subscription_event_type,
+            @enumToInt(event) &
+            @enumToInt(pa_subscription_event_type.PA_SUBSCRIPTION_EVENT_TYPE_MASK)
+        );
+        switch (event_type) {
+            .PA_SUBSCRIPTION_EVENT_NEW => {
+                pa_operation_unref(pa_context_get_sink_input_info(context, idx, sink_new_cb, userdata));
+            },
+            .PA_SUBSCRIPTION_EVENT_CHANGE => {},
+            .PA_SUBSCRIPTION_EVENT_REMOVE => {
+                const entries = @ptrCast(*std.ArrayList(Entry), @alignCast(8, userdata));
+                const i = for (entries.items) |entry, j| {
+                    if (entry.id == idx) break j;
+                } else return;
+                _ = entries.orderedRemove(i);
+            },
+            else => unreachable,
+        }
+    }
+
     fn context_state_cb(context: ?*pa_context, userdata: ?*c_void) callconv(.C) void {
         const state = pa_context_get_state(context);
         switch (state) {
@@ -38,7 +64,9 @@ pub const PulseHandler = struct {
             .PA_CONTEXT_AUTHORIZING => {},
             .PA_CONTEXT_SETTING_NAME => {},
             .PA_CONTEXT_READY => {
+                pa_operation_unref(pa_context_subscribe(context, .PA_SUBSCRIPTION_MASK_SINK_INPUT, null, null));
                 pa_operation_unref(pa_context_get_sink_input_info_list(context, sink_new_cb, userdata));
+                pa_context_set_subscribe_callback(context, context_subscribe_cb, userdata);
             },
             .PA_CONTEXT_FAILED => {
                 std.log.err("failed to connect to pulseaudio", .{});
