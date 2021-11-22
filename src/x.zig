@@ -5,18 +5,29 @@ usingnamespace @cImport({
     @cInclude("X11/Xft/Xft.h");
 });
 
-const width = 100;
-const height = 100;
-const background = 0x222222;
-const foreground = 0xAAAAAA;
+const outer_padding = 20; // Padding between window and entries
+const inner_padding = 20; // Padding between text and volume bar
+const text_height = 12;
+const volume_height = 10;
+const volume_width = 400;
+
+const width = volume_width + outer_padding * 2;
+const height = 4 * (text_height + inner_padding + volume_height + outer_padding * 2);
+
 const font_name = "Fira Code:style=Regular";
 
-const text_render_color = XRenderColor{
-    .red = (foreground >> 16 & 0xFF) * 0x101,
-    .green = (foreground >> 8 & 0xFF) * 0x101,
-    .blue = (foreground & 0xFF) * 0x101,
-    .alpha = 0xFFFF,
-};
+const background = 0x222222;
+const volume_bg = 0x333333;
+const foreground = 0xAAAAAA;
+
+fn renderColor(comptime hex: comptime_int) XRenderColor {
+    return XRenderColor{
+        .red = (hex >> 16 & 0xFF) * 0x101,
+        .green = (hex >> 8 & 0xFF) * 0x101,
+        .blue = (hex & 0xFF) * 0x101,
+        .alpha = 0xFFFF,
+    };
+}
 
 var window_attrs: XSetWindowAttributes = .{
     .background_pixmap = undefined,
@@ -39,7 +50,7 @@ var window_attrs: XSetWindowAttributes = .{
 var gc_values: XGCValues = .{
     .function = undefined,
     .plane_mask = undefined,
-    .foreground = foreground,
+    .foreground = undefined,
     .background = background,
     .line_width = undefined,
     .line_style = undefined,
@@ -68,13 +79,28 @@ fn check(status: c_int, comptime err: anyerror) !void {
     }
 }
 
+fn allocColor(
+    display: *Display,
+    visual: *Visual,
+    colormap: Colormap,
+    render_color: XRenderColor,
+) !XftColor {
+    var color: XftColor = undefined;
+    try check(
+        XftColorAllocValue(display, visual, colormap, &render_color, &color),
+        error.XftColorAllocValue,
+    );
+    return color;
+}
+
 pub const XHandler = struct {
     display: *Display,
     window: Window,
     visual: *Visual,
     colormap: Colormap,
     font: *XftFont,
-    text_color: XftColor,
+    foreground: XftColor,
+    volume_bg: XftColor,
     xft: *XftDraw,
     entries: *std.ArrayList(Entry),
 
@@ -91,18 +117,9 @@ pub const XHandler = struct {
             CWBackPixel | CWEventMask, &window_attrs,
         );
         try check(XMapWindow(display, window), error.XMapWindow);
-        const gc = XCreateGC(
-            display, window,
-            GCForeground | GCBackground,
-            &gc_values,
-        );
+        const gc = XCreateGC(display, window, GCBackground, &gc_values);
 
         const font = XftFontOpenName(display, screen, font_name) orelse return error.XftFontOpenName;
-        var text_color: XftColor = undefined;
-        try check(
-            XftColorAllocValue(display, visual, colormap, &text_render_color, &text_color),
-            error.XftColorAllocValue,
-        );
         const xft = XftDrawCreate(display, window, visual, colormap) orelse return error.XftDrawCreate;
 
         return @This(){
@@ -111,7 +128,8 @@ pub const XHandler = struct {
             .visual = visual,
             .colormap = colormap,
             .font = font,
-            .text_color = text_color,
+            .foreground = try allocColor(display, visual, colormap, renderColor(foreground)),
+            .volume_bg = try allocColor(display, visual, colormap, renderColor(volume_bg)),
             .xft = xft,
             .entries = entries,
         };
@@ -119,19 +137,20 @@ pub const XHandler = struct {
 
     pub fn uninit(self: *@This()) void {
         XftFontClose(self.display, self.font);
-        XftColorFree(self.display, self.visual, self.colormap, &self.text_color);
+        XftColorFree(self.display, self.visual, self.colormap, &self.foreground);
         _ = XCloseDisplay(self.display);
     }
 
     pub fn draw(self: @This()) void {
         _ = XClearWindow(self.display, self.window);
-        var y: c_int = 0;
+        var y: c_int = outer_padding;
         for (self.entries.items) |entry| {
-            const len = @intCast(c_int, entry.name.items.len);
-            y += 20;
-            _ = XftDrawStringUtf8(self.xft, &self.text_color, self.font, 0, y, entry.name.items.ptr, len);
-            _ = XftDrawRect(self.xft, &self.text_color, 0, y + 5, @floatToInt(c_uint, entry.volume * 400.0), 10);
-            y += 12;
+            y += text_height;
+            _ = XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
+            y += inner_padding;
+            _ = XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, 400, 10);
+            _ = XftDrawRect(self.xft, &self.foreground, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
+            y += volume_height + outer_padding;
         }
         _ = XFlush(self.display);
     }
