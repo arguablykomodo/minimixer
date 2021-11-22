@@ -149,6 +149,7 @@ pub const XHandler = struct {
     pub fn uninit(self: *@This()) void {
         XftFontClose(self.display, self.font);
         XftColorFree(self.display, self.visual, self.colormap, &self.foreground);
+        XftColorFree(self.display, self.visual, self.colormap, &self.volume_bg);
         _ = XCloseDisplay(self.display);
     }
 
