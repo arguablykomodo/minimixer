@@ -5,7 +5,9 @@ const PulseHandler = @import("./pulse.zig").PulseHandler;
 pub const Entry = struct {
     id: c_uint,
     name: std.ArrayList(u8),
+    volume: f64,
 };
+
 var entries = std.ArrayList(Entry).init(std.heap.c_allocator);
 
 pub fn main() anyerror!void {

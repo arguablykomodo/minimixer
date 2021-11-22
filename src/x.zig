@@ -125,13 +125,13 @@ pub const XHandler = struct {
 
     pub fn draw(self: @This()) void {
         _ = XClearWindow(self.display, self.window);
-        var extents: XGlyphInfo = undefined;
         var y: c_int = 0;
         for (self.entries.items) |entry| {
             const len = @intCast(c_int, entry.name.items.len);
-            _ = XftTextExtentsUtf8(self.display, self.font, entry.name.items.ptr, len, &extents);
-            y += extents.height;
+            y += 20;
             _ = XftDrawStringUtf8(self.xft, &self.text_color, self.font, 0, y, entry.name.items.ptr, len);
+            _ = XftDrawRect(self.xft, &self.text_color, 0, y + 5, @floatToInt(c_uint, entry.volume * 400.0), 10);
+            y += 12;
         }
         _ = XFlush(self.display);
     }

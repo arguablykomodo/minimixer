@@ -36,6 +36,7 @@ pub const PulseHandler = struct {
         pointers.entries.append(.{
             .id = info.*.index,
             .name = name,
+            .volume = pa_sw_volume_to_linear(pa_cvolume_avg(&info.*.volume)),
         }) catch unreachable;
         pointers.x_handler.draw();
     }
@@ -52,6 +53,7 @@ pub const PulseHandler = struct {
             if (entry.id == info.*.index) {
                 entry.name.clearRetainingCapacity();
                 entry.name.appendSlice(std.mem.span(info.*.name)) catch unreachable;
+                entry.volume = pa_sw_volume_to_linear(pa_cvolume_avg(&info.*.volume));
                 pointers.x_handler.draw();
                 break;
             }
