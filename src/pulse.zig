@@ -149,7 +149,7 @@ pub const PulseHandler = struct {
                 const actual_volume = pa_sw_volume_from_linear(volume);
                 var values = [_]pa_volume_t{0} ** PA_CHANNELS_MAX;
                 var i: usize = 0;
-                while (i < entry.channels): (i += 1) {
+                while (i < entry.channels) : (i += 1) {
                     values[i] = actual_volume;
                 }
                 const cvolume = pa_cvolume{

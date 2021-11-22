@@ -43,11 +43,7 @@ var window_attrs: XSetWindowAttributes = .{
     .backing_planes = undefined,
     .backing_pixel = undefined,
     .save_under = undefined,
-    .event_mask = KeyPressMask
-        | ButtonPressMask
-        | Button1MotionMask
-        | ButtonReleaseMask
-        | ExposureMask,
+    .event_mask = KeyPressMask | ButtonPressMask | Button1MotionMask | ButtonReleaseMask | ExposureMask,
     .do_not_propagate_mask = undefined,
     .override_redirect = undefined,
     .colormap = undefined,
