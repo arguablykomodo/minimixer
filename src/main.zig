@@ -6,15 +6,19 @@ pub const Entry = struct {
     id: c_uint,
     name: std.ArrayList(u8),
     volume: f64,
+    channels: u8,
 };
 
 var entries = std.ArrayList(Entry).init(std.heap.c_allocator);
 
 pub fn main() anyerror!void {
-    var x = try XHandler.init(&entries);
+    var x: XHandler = undefined;
+    var pulse: PulseHandler = undefined;
+
+    x = try XHandler.init(&entries, &pulse);
     defer x.uninit();
 
-    var pulse = try PulseHandler.init(&entries, &x);
+    pulse = try PulseHandler.init(&entries, &x);
     defer pulse.uninit();
 
     try pulse.start();

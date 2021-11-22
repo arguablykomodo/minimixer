@@ -1,5 +1,6 @@
 const std = @import("std");
 const Entry = @import("./main.zig").Entry;
+const PulseHandler = @import("./pulse.zig").PulseHandler;
 usingnamespace @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xft/Xft.h");
@@ -12,7 +13,8 @@ const volume_height = 10;
 const volume_width = 400;
 
 const width = volume_width + outer_padding * 2;
-const height = 4 * (text_height + inner_padding + volume_height + outer_padding * 2);
+const entry_height = text_height + inner_padding + volume_height + outer_padding * 2;
+const height = 4 * entry_height;
 
 const font_name = "Fira Code:style=Regular";
 
@@ -40,7 +42,11 @@ var window_attrs: XSetWindowAttributes = .{
     .backing_planes = undefined,
     .backing_pixel = undefined,
     .save_under = undefined,
-    .event_mask = KeyPressMask | ExposureMask,
+    .event_mask = KeyPressMask
+        | ButtonPressMask
+        | Button1MotionMask
+        | ButtonReleaseMask
+        | ExposureMask,
     .do_not_propagate_mask = undefined,
     .override_redirect = undefined,
     .colormap = undefined,
@@ -103,8 +109,11 @@ pub const XHandler = struct {
     volume_bg: XftColor,
     xft: *XftDraw,
     entries: *std.ArrayList(Entry),
+    pulse_handler: *PulseHandler,
+    selected_entry: ?c_uint,
 
-    pub fn init(entries: *std.ArrayList(Entry)) !@This() {
+    pub fn init(entries: *std.ArrayList(Entry), pulse_handler: *PulseHandler) !@This() {
+        try check(XInitThreads(), error.XInitThreads);
         const display = XOpenDisplay(null) orelse return error.XOpenDisplay;
         const screen = XDefaultScreen(display);
         const visual = XDefaultVisual(display, screen);
@@ -132,6 +141,8 @@ pub const XHandler = struct {
             .volume_bg = try allocColor(display, visual, colormap, renderColor(volume_bg)),
             .xft = xft,
             .entries = entries,
+            .pulse_handler = pulse_handler,
+            .selected_entry = null,
         };
     }
 
@@ -155,14 +166,44 @@ pub const XHandler = struct {
         _ = XFlush(self.display);
     }
 
-    pub fn main_loop(self: @This()) !void {
-        var event: XEvent = undefined;
+    fn set_volume(self: @This(), x: c_int) void {
+        if (self.selected_entry) |selected_entry| {
+            const volume =
+                @intToFloat(f64, std.math.min(volume_width, std.math.max(x - outer_padding, 0))) /
+                @intToFloat(f64, volume_width);
+            self.pulse_handler.set_volume(selected_entry, volume);
+        }
+    }
+
+    pub fn main_loop(self: *@This()) !void {
+        var e: XEvent = undefined;
         while (true) {
-            _ = XNextEvent(self.display, &event);
-            switch (event.type) {
+            _ = XNextEvent(self.display, &e);
+            switch (e.type) {
                 KeyPress => {
-                    const key_press_event = @ptrCast(*XKeyPressedEvent, &event);
-                    if (key_press_event.keycode == 9) return; // ESC
+                    const event = @ptrCast(*XKeyPressedEvent, &e);
+                    if (event.keycode == 9) return; // ESC
+                },
+                ButtonPress => {
+                    const event = @ptrCast(*XButtonPressedEvent, &e);
+                    if (event.button != 1) continue;
+                    const i = @intCast(usize, event.y) / entry_height;
+                    if (self.entries.items.len > i) {
+                        self.selected_entry = self.entries.items[i].id;
+                    } else {
+                        self.selected_entry = null;
+                    }
+                    self.set_volume(event.x);
+                },
+                MotionNotify => {
+                    const event = @ptrCast(*XPointerMovedEvent, &e);
+                    self.set_volume(event.x);
+                },
+                ButtonRelease => {
+                    const event = @ptrCast(*XButtonPressedEvent, &e);
+                    if (event.button != 1) continue;
+                    self.set_volume(event.x);
+                    self.selected_entry = null;
                 },
                 Expose => self.draw(),
                 else => unreachable,

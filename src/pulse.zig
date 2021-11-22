@@ -37,6 +37,7 @@ pub const PulseHandler = struct {
             .id = info.*.index,
             .name = name,
             .volume = pa_sw_volume_to_linear(pa_cvolume_avg(&info.*.volume)),
+            .channels = info.*.volume.channels,
         }) catch unreachable;
         pointers.x_handler.draw();
     }
@@ -140,5 +141,24 @@ pub const PulseHandler = struct {
         pa_context_disconnect(self.context);
         pa_threaded_mainloop_stop(self.mainloop);
         pa_threaded_mainloop_free(self.mainloop);
+    }
+
+    pub fn set_volume(self: @This(), idx: c_uint, volume: f64) void {
+        for (self.pointers.entries.items) |*entry| {
+            if (entry.id == idx) {
+                const actual_volume = pa_sw_volume_from_linear(volume);
+                var values = [_]pa_volume_t{0} ** PA_CHANNELS_MAX;
+                var i: usize = 0;
+                while (i < entry.channels): (i += 1) {
+                    values[i] = actual_volume;
+                }
+                const cvolume = pa_cvolume{
+                    .channels = entry.channels,
+                    .values = values,
+                };
+                pa_operation_unref(pa_context_set_sink_input_volume(self.context, idx, &cvolume, null, null));
+                return;
+            }
+        }
     }
 };
