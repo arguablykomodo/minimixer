@@ -1,7 +1,7 @@
 const std = @import("std");
 const Entry = @import("./main.zig").Entry;
 const PulseHandler = @import("./pulse.zig").PulseHandler;
-usingnamespace @cImport({
+const c = @cImport({
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xft/Xft.h");
 });
@@ -23,8 +23,8 @@ const volume_bg = 0x333333;
 const volume_fg = 0x555555;
 const foreground = 0xAAAAAA;
 
-fn renderColor(comptime hex: comptime_int) XRenderColor {
-    return XRenderColor{
+fn renderColor(comptime hex: comptime_int) c.XRenderColor {
+    return c.XRenderColor{
         .red = (hex >> 16 & 0xFF) * 0x101,
         .green = (hex >> 8 & 0xFF) * 0x101,
         .blue = (hex & 0xFF) * 0x101,
@@ -32,7 +32,7 @@ fn renderColor(comptime hex: comptime_int) XRenderColor {
     };
 }
 
-var window_attrs: XSetWindowAttributes = .{
+var window_attrs: c.XSetWindowAttributes = .{
     .background_pixmap = undefined,
     .background_pixel = background,
     .border_pixmap = undefined,
@@ -43,14 +43,14 @@ var window_attrs: XSetWindowAttributes = .{
     .backing_planes = undefined,
     .backing_pixel = undefined,
     .save_under = undefined,
-    .event_mask = KeyPressMask | ButtonPressMask | Button1MotionMask | ButtonReleaseMask | ExposureMask,
+    .event_mask = c.KeyPressMask | c.ButtonPressMask | c.Button1MotionMask | c.ButtonReleaseMask | c.ExposureMask,
     .do_not_propagate_mask = undefined,
     .override_redirect = undefined,
     .colormap = undefined,
     .cursor = undefined,
 };
 
-var gc_values: XGCValues = .{
+var gc_values: c.XGCValues = .{
     .function = undefined,
     .plane_mask = undefined,
     .foreground = undefined,
@@ -83,51 +83,51 @@ fn check(status: c_int, comptime err: anyerror) !void {
 }
 
 fn allocColor(
-    display: *Display,
-    visual: *Visual,
-    colormap: Colormap,
-    render_color: XRenderColor,
-) !XftColor {
-    var color: XftColor = undefined;
+    display: *c.Display,
+    visual: *c.Visual,
+    colormap: c.Colormap,
+    render_color: c.XRenderColor,
+) !c.XftColor {
+    var color: c.XftColor = undefined;
     try check(
-        XftColorAllocValue(display, visual, colormap, &render_color, &color),
+        c.XftColorAllocValue(display, visual, colormap, &render_color, &color),
         error.XftColorAllocValue,
     );
     return color;
 }
 
 pub const XHandler = struct {
-    display: *Display,
-    window: Window,
-    visual: *Visual,
-    colormap: Colormap,
-    font: *XftFont,
-    foreground: XftColor,
-    volume_bg: XftColor,
-    volume_fg: XftColor,
-    xft: *XftDraw,
+    display: *c.Display,
+    window: c.Window,
+    visual: *c.Visual,
+    colormap: c.Colormap,
+    font: *c.XftFont,
+    foreground: c.XftColor,
+    volume_bg: c.XftColor,
+    volume_fg: c.XftColor,
+    xft: *c.XftDraw,
     entries: *std.ArrayList(Entry),
     pulse_handler: *PulseHandler,
     selected_entry: ?c_uint,
 
     pub fn init(entries: *std.ArrayList(Entry), pulse_handler: *PulseHandler) !@This() {
-        try check(XInitThreads(), error.XInitThreads);
-        const display = XOpenDisplay(null) orelse return error.XOpenDisplay;
-        const screen = XDefaultScreen(display);
-        const visual = XDefaultVisual(display, screen);
-        const colormap = XDefaultColormap(display, screen);
+        try check(c.XInitThreads(), error.XInitThreads);
+        const display = c.XOpenDisplay(null) orelse return error.XOpenDisplay;
+        const screen = c.XDefaultScreen(display);
+        const visual = c.XDefaultVisual(display, screen);
+        const colormap = c.XDefaultColormap(display, screen);
 
-        const window = XCreateWindow(
-            display, XDefaultRootWindow(display),
+        const window = c.XCreateWindow(
+            display, c.XDefaultRootWindow(display),
             0, 0, width, height, 0,
-            CopyFromParent, InputOutput, visual,
-            CWBackPixel | CWEventMask, &window_attrs,
+            c.CopyFromParent, c.InputOutput, visual,
+            c.CWBackPixel | c.CWEventMask, &window_attrs,
         );
-        try check(XMapWindow(display, window), error.XMapWindow);
-        const gc = XCreateGC(display, window, GCBackground, &gc_values);
+        try check(c.XMapWindow(display, window), error.XMapWindow);
+        // const gc = c.XCreateGC(display, window, .GCBackground, &gc_values);
 
-        const font = XftFontOpenName(display, screen, font_name) orelse return error.XftFontOpenName;
-        const xft = XftDrawCreate(display, window, visual, colormap) orelse return error.XftDrawCreate;
+        const font = c.XftFontOpenName(display, screen, font_name) orelse return error.XftFontOpenName;
+        const xft = c.XftDrawCreate(display, window, visual, colormap) orelse return error.XftDrawCreate;
 
         return @This(){
             .display = display,
@@ -146,24 +146,24 @@ pub const XHandler = struct {
     }
 
     pub fn uninit(self: *@This()) void {
-        XftFontClose(self.display, self.font);
-        XftColorFree(self.display, self.visual, self.colormap, &self.foreground);
-        XftColorFree(self.display, self.visual, self.colormap, &self.volume_bg);
-        _ = XCloseDisplay(self.display);
+        c.XftFontClose(self.display, self.font);
+        c.XftColorFree(self.display, self.visual, self.colormap, &self.foreground);
+        c.XftColorFree(self.display, self.visual, self.colormap, &self.volume_bg);
+        _ = c.XCloseDisplay(self.display);
     }
 
     pub fn draw(self: @This()) void {
-        _ = XClearWindow(self.display, self.window);
+        _ = c.XClearWindow(self.display, self.window);
         var y: c_int = outer_padding;
         for (self.entries.items) |entry| {
             y += text_height;
-            _ = XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
+            _ = c.XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
             y += inner_padding;
-            _ = XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, 400, 10);
-            _ = XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
+            _ = c.XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, 400, 10);
+            _ = c.XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
             y += volume_height + outer_padding;
         }
-        _ = XFlush(self.display);
+        _ = c.XFlush(self.display);
     }
 
     fn set_volume(self: @This(), x: c_int) void {
@@ -176,16 +176,16 @@ pub const XHandler = struct {
     }
 
     pub fn main_loop(self: *@This()) !void {
-        var e: XEvent = undefined;
+        var e: c.XEvent = undefined;
         while (true) {
-            _ = XNextEvent(self.display, &e);
+            _ = c.XNextEvent(self.display, &e);
             switch (e.type) {
-                KeyPress => {
-                    const event = @ptrCast(*XKeyPressedEvent, &e);
+                c.KeyPress => {
+                    const event = @ptrCast(*c.XKeyPressedEvent, &e);
                     if (event.keycode == 9) return; // ESC
                 },
-                ButtonPress => {
-                    const event = @ptrCast(*XButtonPressedEvent, &e);
+                c.ButtonPress => {
+                    const event = @ptrCast(*c.XButtonPressedEvent, &e);
                     if (event.button != 1) continue;
                     const i = @intCast(usize, event.y) / entry_height;
                     if (self.entries.items.len > i) {
@@ -195,17 +195,17 @@ pub const XHandler = struct {
                     }
                     self.set_volume(event.x);
                 },
-                MotionNotify => {
-                    const event = @ptrCast(*XPointerMovedEvent, &e);
+                c.MotionNotify => {
+                    const event = @ptrCast(*c.XPointerMovedEvent, &e);
                     self.set_volume(event.x);
                 },
-                ButtonRelease => {
-                    const event = @ptrCast(*XButtonPressedEvent, &e);
+                c.ButtonRelease => {
+                    const event = @ptrCast(*c.XButtonPressedEvent, &e);
                     if (event.button != 1) continue;
                     self.set_volume(event.x);
                     self.selected_entry = null;
                 },
-                Expose => self.draw(),
+                c.Expose => self.draw(),
                 else => unreachable,
             }
         }
