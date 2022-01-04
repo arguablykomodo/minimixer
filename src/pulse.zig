@@ -27,7 +27,7 @@ pub const PulseHandler = struct {
         _: ?*c.pa_context,
         info: [*c]const c.pa_sink_input_info,
         eol: c_int,
-        userdata: ?*c_void,
+        userdata: ?*anyopaque,
     ) callconv(.C) void {
         if (eol == 1) return;
         var name = std.ArrayList(u8).init(std.heap.c_allocator);
@@ -46,7 +46,7 @@ pub const PulseHandler = struct {
         _: ?*c.pa_context,
         info: [*c]const c.pa_sink_input_info,
         eol: c_int,
-        userdata: ?*c_void,
+        userdata: ?*anyopaque,
     ) callconv(.C) void {
         if (eol == 1) return;
         const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
@@ -65,7 +65,7 @@ pub const PulseHandler = struct {
         context: ?*c.pa_context,
         event: c.pa_subscription_event_type,
         idx: c_uint,
-        userdata: ?*c_void,
+        userdata: ?*anyopaque,
     ) callconv(.C) void {
         const event_type = event & c.PA_SUBSCRIPTION_EVENT_TYPE_MASK;
         switch (event_type) {
@@ -90,7 +90,7 @@ pub const PulseHandler = struct {
         }
     }
 
-    fn context_state_cb(context: ?*c.pa_context, userdata: ?*c_void) callconv(.C) void {
+    fn context_state_cb(context: ?*c.pa_context, userdata: ?*anyopaque) callconv(.C) void {
         const state = c.pa_context_get_state(context);
         switch (state) {
             c.PA_CONTEXT_UNCONNECTED => {},
