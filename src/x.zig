@@ -149,6 +149,7 @@ pub const XHandler = struct {
         c.XftFontClose(self.display, self.font);
         c.XftColorFree(self.display, self.visual, self.colormap, &self.foreground);
         c.XftColorFree(self.display, self.visual, self.colormap, &self.volume_bg);
+        c.XftColorFree(self.display, self.visual, self.colormap, &self.volume_fg);
         _ = c.XCloseDisplay(self.display);
     }
 
@@ -169,7 +170,7 @@ pub const XHandler = struct {
     fn set_volume(self: @This(), x: c_int) void {
         if (self.selected_entry) |selected_entry| {
             const volume =
-                @intToFloat(f64, std.math.min(volume_width, std.math.max(x - outer_padding, 0))) /
+                @intToFloat(f64, @minimum(volume_width, @maximum(x - outer_padding, 0))) /
                 @intToFloat(f64, volume_width);
             self.pulse_handler.set_volume(selected_entry, volume);
         }
