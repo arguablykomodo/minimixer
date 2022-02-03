@@ -32,50 +32,6 @@ fn renderColor(comptime hex: comptime_int) c.XRenderColor {
     };
 }
 
-var window_attrs: c.XSetWindowAttributes = .{
-    .background_pixmap = undefined,
-    .background_pixel = background,
-    .border_pixmap = undefined,
-    .border_pixel = undefined,
-    .bit_gravity = undefined,
-    .win_gravity = undefined,
-    .backing_store = undefined,
-    .backing_planes = undefined,
-    .backing_pixel = undefined,
-    .save_under = undefined,
-    .event_mask = c.KeyPressMask | c.ButtonPressMask | c.Button1MotionMask | c.ButtonReleaseMask | c.ExposureMask,
-    .do_not_propagate_mask = undefined,
-    .override_redirect = undefined,
-    .colormap = undefined,
-    .cursor = undefined,
-};
-
-var gc_values: c.XGCValues = .{
-    .function = undefined,
-    .plane_mask = undefined,
-    .foreground = undefined,
-    .background = background,
-    .line_width = undefined,
-    .line_style = undefined,
-    .cap_style = undefined,
-    .join_style = undefined,
-    .fill_style = undefined,
-    .fill_rule = undefined,
-    .arc_mode = undefined,
-    .tile = undefined,
-    .stipple = undefined,
-    .ts_x_origin = undefined,
-    .ts_y_origin = undefined,
-    .font = undefined,
-    .subwindow_mode = undefined,
-    .graphics_exposures = undefined,
-    .clip_x_origin = undefined,
-    .clip_y_origin = undefined,
-    .clip_mask = undefined,
-    .dash_offset = undefined,
-    .dashes = undefined,
-};
-
 fn check(status: c_int, comptime err: anyerror) !void {
     if (status == 0) {
         return err;
@@ -117,6 +73,10 @@ pub const XHandler = struct {
         const visual = c.XDefaultVisual(display, screen);
         const colormap = c.XDefaultColormap(display, screen);
 
+        var window_attrs = std.mem.zeroes(c.XSetWindowAttributes);
+        window_attrs.background_pixel = background;
+        window_attrs.event_mask = c.KeyPressMask | c.ButtonPressMask | c.Button1MotionMask | c.ButtonReleaseMask | c.ExposureMask;
+
         const window = c.XCreateWindow(
             display, c.XDefaultRootWindow(display),
             0, 0, width, height, 0,
@@ -124,7 +84,6 @@ pub const XHandler = struct {
             c.CWBackPixel | c.CWEventMask, &window_attrs,
         );
         try check(c.XMapWindow(display, window), error.XMapWindow);
-        // const gc = c.XCreateGC(display, window, .GCBackground, &gc_values);
 
         const font = c.XftFontOpenName(display, screen, font_name) orelse return error.XftFontOpenName;
         const xft = c.XftDrawCreate(display, window, visual, colormap) orelse return error.XftDrawCreate;
