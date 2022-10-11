@@ -8,15 +8,17 @@ const c = @cImport({
 
 const outer_padding = 20; // Padding between window and entries
 const inner_padding = 20; // Padding between text and volume bar
-const text_height = 12;
+const font_family = "Fira Code";
+const font_style = "Regular";
+const font_size = 12;
 const volume_height = 10;
 const volume_width = 400;
 
 const width = volume_width + outer_padding * 2;
-const entry_height = text_height + inner_padding + volume_height + outer_padding * 2;
+const entry_height = font_size + inner_padding + volume_height + outer_padding * 2;
 const height = 4 * entry_height;
 
-const font_name = "Fira Code:style=Regular";
+const font_name = std.fmt.comptimePrint("{s}:style={s}:size={}", .{ font_family, font_style, font_size });
 
 const background = 0x222222;
 const volume_bg = 0x333333;
@@ -116,10 +118,10 @@ pub const XHandler = struct {
         _ = c.XClearWindow(self.display, self.window);
         var y: c_int = outer_padding;
         for (self.entries.items) |entry| {
-            y += text_height;
+            y += font_size;
             _ = c.XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
             y += inner_padding;
-            _ = c.XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, 400, 10);
+            _ = c.XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, volume_width, volume_height);
             _ = c.XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
             y += volume_height + outer_padding;
         }
