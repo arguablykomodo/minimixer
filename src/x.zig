@@ -131,7 +131,7 @@ pub const XHandler = struct {
     fn set_volume(self: @This(), x: c_int) void {
         if (self.selected_entry) |selected_entry| {
             const volume =
-                @intToFloat(f64, @minimum(volume_width, @maximum(x - outer_padding, 0))) /
+                @intToFloat(f64, @min(volume_width, @max(x - outer_padding, 0))) /
                 @intToFloat(f64, volume_width);
             self.pulse_handler.set_volume(selected_entry, volume);
         }
