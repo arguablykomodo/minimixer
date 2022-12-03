@@ -5,7 +5,7 @@ const PulseHandler = @import("./pulse.zig").PulseHandler;
 pub const Entry = struct {
     id: c_uint,
     name: std.ArrayList(u8),
-    volume: f64,
+    volume: u32,
     channels: u8,
 };
 

@@ -36,7 +36,7 @@ pub const PulseHandler = struct {
         pointers.entries.append(.{
             .id = info.*.index,
             .name = name,
-            .volume = c.pa_sw_volume_to_linear(c.pa_cvolume_avg(&info.*.volume)),
+            .volume = c.pa_cvolume_avg(&info.*.volume),
             .channels = info.*.volume.channels,
         }) catch unreachable;
         pointers.x_handler.draw();
@@ -54,7 +54,7 @@ pub const PulseHandler = struct {
             if (entry.id == info.*.index) {
                 entry.name.clearRetainingCapacity();
                 entry.name.appendSlice(std.mem.span(info.*.name)) catch unreachable;
-                entry.volume = c.pa_sw_volume_to_linear(c.pa_cvolume_avg(&info.*.volume));
+                entry.volume = c.pa_cvolume_avg(&info.*.volume);
                 pointers.x_handler.draw();
                 break;
             }
@@ -143,16 +143,11 @@ pub const PulseHandler = struct {
     pub fn set_volume(self: @This(), idx: c_uint, volume: f64) void {
         for (self.pointers.entries.items) |*entry| {
             if (entry.id == idx) {
-                const actual_volume = c.pa_sw_volume_from_linear(volume);
-                var values = [_]c.pa_volume_t{0} ** c.PA_CHANNELS_MAX;
-                var i: usize = 0;
-                while (i < entry.channels) : (i += 1) {
-                    values[i] = actual_volume;
-                }
-                const cvolume = c.pa_cvolume{
+                var cvolume = c.pa_cvolume{
                     .channels = entry.channels,
-                    .values = values,
+                    .values = [_]c.pa_volume_t{0} ** c.PA_CHANNELS_MAX,
                 };
+                _ = c.pa_cvolume_set(&cvolume, entry.channels, @floatToInt(u32, volume * @intToFloat(f64, c.PA_VOLUME_NORM)));
                 c.pa_operation_unref(c.pa_context_set_sink_input_volume(self.context, idx, &cvolume, null, null));
                 return;
             }

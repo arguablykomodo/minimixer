@@ -2,6 +2,7 @@ const std = @import("std");
 const Entry = @import("./main.zig").Entry;
 const PulseHandler = @import("./pulse.zig").PulseHandler;
 const c = @cImport({
+    @cInclude("pulse/pulseaudio.h");
     @cInclude("X11/Xlib.h");
     @cInclude("X11/Xft/Xft.h");
 });
@@ -122,7 +123,7 @@ pub const XHandler = struct {
             _ = c.XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
             y += inner_padding;
             _ = c.XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, volume_width, volume_height);
-            _ = c.XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @floatToInt(c_uint, entry.volume * volume_width), volume_height);
+            _ = c.XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @as(c_uint, entry.volume * volume_width / c.PA_VOLUME_NORM), volume_height);
             y += volume_height + outer_padding;
         }
         _ = c.XFlush(self.display);
