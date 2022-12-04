@@ -1,6 +1,6 @@
 const std = @import("std");
-const Entry = @import("./main.zig").Entry;
-const PulseHandler = @import("./pulse.zig").PulseHandler;
+const Entry = @import("main.zig").Entry;
+const PulseHandler = @import("pulse.zig").PulseHandler;
 const c = @cImport({
     @cInclude("pulse/pulseaudio.h");
     @cInclude("X11/Xlib.h");
@@ -80,12 +80,7 @@ pub const XHandler = struct {
         window_attrs.background_pixel = background;
         window_attrs.event_mask = c.KeyPressMask | c.ButtonPressMask | c.Button1MotionMask | c.ButtonReleaseMask | c.ExposureMask;
 
-        const window = c.XCreateWindow(
-            display, c.XDefaultRootWindow(display),
-            0, 0, width, height, 0,
-            c.CopyFromParent, c.InputOutput, visual,
-            c.CWBackPixel | c.CWEventMask, &window_attrs,
-        );
+        const window = c.XCreateWindow(display, c.XDefaultRootWindow(display), 0, 0, width, height, 0, c.CopyFromParent, c.InputOutput, visual, c.CWBackPixel | c.CWEventMask, &window_attrs);
         try check(c.XMapWindow(display, window), error.XMapWindow);
 
         const font = c.XftFontOpenName(display, screen, font_name) orelse return error.XftFontOpenName;
@@ -129,16 +124,16 @@ pub const XHandler = struct {
         _ = c.XFlush(self.display);
     }
 
-    fn set_volume(self: @This(), x: c_int) void {
+    fn setVolume(self: @This(), x: c_int) void {
         if (self.selected_entry) |selected_entry| {
             const volume =
                 @intToFloat(f64, @min(volume_width, @max(x - outer_padding, 0))) /
                 @intToFloat(f64, volume_width);
-            self.pulse_handler.set_volume(selected_entry, volume);
+            self.pulse_handler.setVolume(selected_entry, volume);
         }
     }
 
-    pub fn main_loop(self: *@This()) !void {
+    pub fn mainLoop(self: *@This()) !void {
         var e: c.XEvent = undefined;
         while (true) {
             _ = c.XNextEvent(self.display, &e);
@@ -156,16 +151,16 @@ pub const XHandler = struct {
                     } else {
                         self.selected_entry = null;
                     }
-                    self.set_volume(event.x);
+                    self.setVolume(event.x);
                 },
                 c.MotionNotify => {
                     const event = @ptrCast(*c.XPointerMovedEvent, &e);
-                    self.set_volume(event.x);
+                    self.setVolume(event.x);
                 },
                 c.ButtonRelease => {
                     const event = @ptrCast(*c.XButtonPressedEvent, &e);
                     if (event.button != 1) continue;
-                    self.set_volume(event.x);
+                    self.setVolume(event.x);
                     self.selected_entry = null;
                 },
                 c.Expose => self.draw(),

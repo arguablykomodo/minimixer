@@ -1,6 +1,6 @@
 const std = @import("std");
-const Entry = @import("./main.zig").Entry;
-const XHandler = @import("./x.zig").XHandler;
+const Entry = @import("main.zig").Entry;
+const XHandler = @import("x.zig").XHandler;
 const c = @cImport({
     @cInclude("pulse/pulseaudio.h");
 });
@@ -23,7 +23,7 @@ pub const PulseHandler = struct {
     context: *c.pa_context,
     pointers: Pointers,
 
-    fn sink_new_cb(
+    fn newInputCallback(
         _: ?*c.pa_context,
         info: [*c]const c.pa_sink_input_info,
         eol: c_int,
@@ -42,7 +42,7 @@ pub const PulseHandler = struct {
         pointers.x_handler.draw();
     }
 
-    fn sink_change_cb(
+    fn changedInputCallback(
         _: ?*c.pa_context,
         info: [*c]const c.pa_sink_input_info,
         eol: c_int,
@@ -61,7 +61,7 @@ pub const PulseHandler = struct {
         }
     }
 
-    fn context_subscribe_cb(
+    fn contextSubscribeCallback(
         context: ?*c.pa_context,
         event: c.pa_subscription_event_type,
         idx: c_uint,
@@ -70,10 +70,10 @@ pub const PulseHandler = struct {
         const event_type = event & c.PA_SUBSCRIPTION_EVENT_TYPE_MASK;
         switch (event_type) {
             c.PA_SUBSCRIPTION_EVENT_NEW => {
-                c.pa_operation_unref(c.pa_context_get_sink_input_info(context, idx, sink_new_cb, userdata));
+                c.pa_operation_unref(c.pa_context_get_sink_input_info(context, idx, newInputCallback, userdata));
             },
             c.PA_SUBSCRIPTION_EVENT_CHANGE => {
-                c.pa_operation_unref(c.pa_context_get_sink_input_info(context, idx, sink_change_cb, userdata));
+                c.pa_operation_unref(c.pa_context_get_sink_input_info(context, idx, changedInputCallback, userdata));
             },
             c.PA_SUBSCRIPTION_EVENT_REMOVE => {
                 const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
@@ -90,7 +90,7 @@ pub const PulseHandler = struct {
         }
     }
 
-    fn context_state_cb(context: ?*c.pa_context, userdata: ?*anyopaque) callconv(.C) void {
+    fn contextStateCallback(context: ?*c.pa_context, userdata: ?*anyopaque) callconv(.C) void {
         const state = c.pa_context_get_state(context);
         switch (state) {
             c.PA_CONTEXT_UNCONNECTED => {},
@@ -98,8 +98,8 @@ pub const PulseHandler = struct {
             c.PA_CONTEXT_AUTHORIZING => {},
             c.PA_CONTEXT_SETTING_NAME => {},
             c.PA_CONTEXT_READY => {
-                c.pa_operation_unref(c.pa_context_get_sink_input_info_list(context, sink_new_cb, userdata));
-                c.pa_context_set_subscribe_callback(context, context_subscribe_cb, userdata);
+                c.pa_operation_unref(c.pa_context_get_sink_input_info_list(context, newInputCallback, userdata));
+                c.pa_context_set_subscribe_callback(context, contextSubscribeCallback, userdata);
                 c.pa_operation_unref(c.pa_context_subscribe(context, c.PA_SUBSCRIPTION_MASK_SINK_INPUT, null, null));
             },
             c.PA_CONTEXT_FAILED => {
@@ -129,7 +129,7 @@ pub const PulseHandler = struct {
     }
 
     pub fn start(self: *@This()) !void {
-        c.pa_context_set_state_callback(self.context, context_state_cb, &self.pointers);
+        c.pa_context_set_state_callback(self.context, contextStateCallback, &self.pointers);
         try check(c.pa_context_connect(self.context, null, c.PA_CONTEXT_NOAUTOSPAWN, null), error.PulseContextConnect);
         try check(c.pa_threaded_mainloop_start(self.mainloop), error.PulseMainloopStart);
     }
@@ -140,7 +140,7 @@ pub const PulseHandler = struct {
         c.pa_threaded_mainloop_free(self.mainloop);
     }
 
-    pub fn set_volume(self: @This(), idx: c_uint, volume: f64) void {
+    pub fn setVolume(self: @This(), idx: c_uint, volume: f64) void {
         for (self.pointers.entries.items) |*entry| {
             if (entry.id == idx) {
                 var cvolume = c.pa_cvolume{

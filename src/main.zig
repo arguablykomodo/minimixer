@@ -1,6 +1,6 @@
 const std = @import("std");
-const XHandler = @import("./x.zig").XHandler;
-const PulseHandler = @import("./pulse.zig").PulseHandler;
+const XHandler = @import("x.zig").XHandler;
+const PulseHandler = @import("pulse.zig").PulseHandler;
 
 pub const Entry = struct {
     id: c_uint,
@@ -22,5 +22,5 @@ pub fn main() anyerror!void {
     defer pulse.uninit();
 
     try pulse.start();
-    try x.main_loop();
+    try x.mainLoop();
 }
