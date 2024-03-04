@@ -115,7 +115,7 @@ pub const XHandler = struct {
         var y: c_int = outer_padding;
         for (self.entries.items) |entry| {
             y += font_size;
-            _ = c.XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @intCast(c_int, entry.name.items.len));
+            _ = c.XftDrawStringUtf8(self.xft, &self.foreground, self.font, outer_padding, y, entry.name.items.ptr, @as(c_int, @intCast(entry.name.items.len)));
             y += inner_padding;
             _ = c.XftDrawRect(self.xft, &self.volume_bg, outer_padding, y, volume_width, volume_height);
             _ = c.XftDrawRect(self.xft, &self.volume_fg, outer_padding, y, @as(c_uint, entry.volume * volume_width / c.PA_VOLUME_NORM), volume_height);
@@ -127,8 +127,8 @@ pub const XHandler = struct {
     fn setVolume(self: @This(), x: c_int) void {
         if (self.selected_entry) |selected_entry| {
             const volume =
-                @intToFloat(f64, @min(volume_width, @max(x - outer_padding, 0))) /
-                @intToFloat(f64, volume_width);
+                @as(f64, @floatFromInt(@min(volume_width, @max(x - outer_padding, 0)))) /
+                @as(f64, @floatFromInt(volume_width));
             self.pulse_handler.setVolume(selected_entry, volume);
         }
     }
@@ -139,13 +139,13 @@ pub const XHandler = struct {
             _ = c.XNextEvent(self.display, &e);
             switch (e.type) {
                 c.KeyPress => {
-                    const event = @ptrCast(*c.XKeyPressedEvent, &e);
+                    const event: *c.XKeyPressedEvent = @ptrCast(&e);
                     if (event.keycode == 9) return; // ESC
                 },
                 c.ButtonPress => {
-                    const event = @ptrCast(*c.XButtonPressedEvent, &e);
+                    const event: *c.XButtonPressedEvent = @ptrCast(&e);
                     if (event.button != 1) continue;
-                    const i = @intCast(usize, event.y) / entry_height;
+                    const i = @as(usize, @intCast(event.y)) / entry_height;
                     if (self.entries.items.len > i) {
                         self.selected_entry = self.entries.items[i].id;
                     } else {
@@ -154,11 +154,11 @@ pub const XHandler = struct {
                     self.setVolume(event.x);
                 },
                 c.MotionNotify => {
-                    const event = @ptrCast(*c.XPointerMovedEvent, &e);
+                    const event: *c.XPointerMovedEvent = @ptrCast(&e);
                     self.setVolume(event.x);
                 },
                 c.ButtonRelease => {
-                    const event = @ptrCast(*c.XButtonPressedEvent, &e);
+                    const event: *c.XButtonPressedEvent = @ptrCast(&e);
                     if (event.button != 1) continue;
                     self.setVolume(event.x);
                     self.selected_entry = null;

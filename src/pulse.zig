@@ -32,7 +32,7 @@ pub const PulseHandler = struct {
         if (eol == 1) return;
         var name = std.ArrayList(u8).init(std.heap.c_allocator);
         name.appendSlice(std.mem.span(info.*.name)) catch unreachable;
-        const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
+        const pointers: *Pointers = @alignCast(@ptrCast(userdata));
         pointers.entries.append(.{
             .id = info.*.index,
             .name = name,
@@ -49,7 +49,7 @@ pub const PulseHandler = struct {
         userdata: ?*anyopaque,
     ) callconv(.C) void {
         if (eol == 1) return;
-        const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
+        const pointers: *Pointers = @alignCast(@ptrCast(userdata));
         for (pointers.entries.items) |*entry| {
             if (entry.id == info.*.index) {
                 entry.name.clearRetainingCapacity();
@@ -76,8 +76,8 @@ pub const PulseHandler = struct {
                 c.pa_operation_unref(c.pa_context_get_sink_input_info(context, idx, changedInputCallback, userdata));
             },
             c.PA_SUBSCRIPTION_EVENT_REMOVE => {
-                const pointers = @ptrCast(*Pointers, @alignCast(@alignOf(*Pointers), userdata));
-                for (pointers.entries.items) |entry, i| {
+                const pointers: *Pointers = @alignCast(@ptrCast(userdata));
+                for (pointers.entries.items, 0..) |entry, i| {
                     if (entry.id == idx) {
                         entry.name.deinit();
                         _ = pointers.entries.orderedRemove(i);
@@ -147,7 +147,7 @@ pub const PulseHandler = struct {
                     .channels = entry.channels,
                     .values = [_]c.pa_volume_t{0} ** c.PA_CHANNELS_MAX,
                 };
-                _ = c.pa_cvolume_set(&cvolume, entry.channels, @floatToInt(u32, volume * @intToFloat(f64, c.PA_VOLUME_NORM)));
+                _ = c.pa_cvolume_set(&cvolume, entry.channels, @intFromFloat(volume * @as(f32, @floatFromInt(c.PA_VOLUME_NORM))));
                 c.pa_operation_unref(c.pa_context_set_sink_input_volume(self.context, idx, &cvolume, null, null));
                 return;
             }
