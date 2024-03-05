@@ -7,11 +7,11 @@ const c = @cImport({
     @cInclude("X11/Xft/Xft.h");
 });
 
-const outer_padding = 20; // Padding between window and entries
-const inner_padding = 20; // Padding between text and volume bar
-const font_family = "Fira Code";
-const font_style = "Regular";
-const font_size = 12;
+const outer_padding = 10; // Padding between window and entries
+const inner_padding = 10; // Padding between text and volume bar
+const font_family = "Cascadia Code";
+const font_style = "Medium";
+const font_size = 10;
 const volume_height = 10;
 const volume_width = 400;
 
@@ -21,10 +21,10 @@ const height = 4 * entry_height;
 
 const font_name = std.fmt.comptimePrint("{s}:style={s}:size={}", .{ font_family, font_style, font_size });
 
-const background = 0x222222;
-const volume_bg = 0x333333;
-const volume_fg = 0x555555;
-const foreground = 0xAAAAAA;
+const background = 0x181616;
+const volume_bg = 0x0D0C0C;
+const volume_fg = 0xC5C9C5;
+const foreground = 0xC5C9C5;
 
 fn renderColor(comptime hex: comptime_int) c.XRenderColor {
     return c.XRenderColor{
